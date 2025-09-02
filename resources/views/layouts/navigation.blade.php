@@ -70,6 +70,17 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+            <x-nav-link href="{{ route('events.index') }}" :active="request()->is('events')">
+                {{ __('Events') }}
+            </x-nav-link>
+            
+            @auth
+                @if(auth()->user()->is_admin)
+                    <x-nav-link href="{{ route('admin.events.index') }}" :active="request()->is('admin/events*')">
+                        {{ __('Admin Events') }}
+                    </x-nav-link>
+                @endif
+            @endauth
         </div>
 
         <!-- Responsive Settings Options -->
