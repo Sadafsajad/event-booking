@@ -1,12 +1,13 @@
-<x-mail::message>
-# Introduction
+@component('mail::message')
+# Booking Confirmed
 
-The body of your message.
+Hi {{ $user->name }},
 
-<x-mail::button :url="''">
-Button Text
-</x-mail::button>
+**Event:** {{ $event->title }}
+**Venue:** {{ $event->venue }}
+**When:** {{ $event->event_at->format('d M Y, h:i A') }}
+**Tickets:** {{ $qty }}
 
-Thanks,<br>
+Thanks,
 {{ config('app.name') }}
-</x-mail::message>
+@endcomponent

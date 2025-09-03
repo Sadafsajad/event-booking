@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
 
 class BookingController extends Controller
 {
@@ -19,31 +21,50 @@ class BookingController extends Controller
         $user = Auth::user();
 
         $booking = DB::transaction(function () use ($event, $qty, $user) {
-            // lock the row to avoid race conditions
+            // Lock the event row to avoid race conditions
             $e = Event::whereKey($event->id)->lockForUpdate()->first();
 
-            $already = (int) $e->bookings()->sum('qty');
-            if ($already + $qty > $e->capacity) {
+            // If user already booked this event (unique user_id,event_id), give friendly error
+            $alreadyUser = Booking::where('user_id', $user->id)
+                ->where('event_id', $e->id)
+                ->exists();
+            if ($alreadyUser) {
                 throw ValidationException::withMessages([
-                    'qty' => 'Event is full or not enough seats.'
+                    'qty' => 'You have already booked this event.',
                 ]);
             }
 
-            // prevent duplicate booking by same user
-            $booking = Booking::firstOrCreate(
-                ['user_id' => $user->id, 'event_id' => $e->id],
-                ['qty' => $qty]
-            );
+            // Check current seats
+            $booked = (int) Booking::where('event_id', $e->id)->sum('qty');
+            $remaining = max(0, $e->capacity - $booked);
+            if ($remaining <= 0 || $qty > $remaining) {
+                throw ValidationException::withMessages([
+                    'qty' => "Only {$remaining} seat(s) left.",
+                ]);
+            }
 
-            // if exists, you might want to increase qty instead:
-            // $booking->increment('qty', $qty);
-
-            return $booking;
+            return Booking::create([
+                'user_id' => $user->id,
+                'event_id' => $e->id,
+                'qty' => $qty,
+            ]);
         });
 
-        // Bonus: queue a confirmation email
-        \Mail::to($user->email)->queue(new BookingConfirmed($booking));
+        // Invalidate cached event lists (your versioned cache)
+        if (!Cache::has('events:version')) {
+            Cache::forever('events:version', 1);
+        } else {
+            Cache::increment('events:version');
+        }
 
-        return ['message' => 'Booked!', 'booking' => $booking];
+        // Simple email (local dev: set MAIL_MAILER=log to see it in storage/logs/laravel.log)
+        Mail::to($user->email)->send(new BookingConfirmed($booking));
+
+        // Web vs API response
+        if ($r->expectsJson() || $r->wantsJson()) {
+            return response()->json(['message' => 'Booked!', 'booking' => $booking], 201);
+        }
+
+        return back()->with('status', 'Booking confirmed!');
     }
 }
