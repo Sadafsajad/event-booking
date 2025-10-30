@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Mail\BookingConfirmed;
 use App\Models\Booking;
 use App\Models\Event;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Log;
 
 class BookingController extends Controller
 {
@@ -18,21 +20,18 @@ class BookingController extends Controller
     {
         $data = $r->validate(['qty' => 'nullable|integer|min:1']);
         $qty = $data['qty'] ?? 1;
-        $user = Auth::user();
+
+        // temporarily disable auth dependency while testing
+        // $user = Auth::user();
+        $user = (object) [
+            'id' => 1,
+            'email' => 'sadafsajad451@gmail.com'
+        ];
 
         $booking = DB::transaction(function () use ($event, $qty, $user) {
-            // Lock the event row to avoid race conditions
+            // Lock event to avoid race conditions
             $e = Event::whereKey($event->id)->lockForUpdate()->first();
 
-            // If user already booked this event (unique user_id,event_id), give friendly error
-            $alreadyUser = Booking::where('user_id', $user->id)
-                ->where('event_id', $e->id)
-                ->exists();
-            if ($alreadyUser) {
-                throw ValidationException::withMessages([
-                    'qty' => 'You have already booked this event.',
-                ]);
-            }
 
             // Check current seats
             $booked = (int) Booking::where('event_id', $e->id)->sum('qty');
@@ -50,21 +49,16 @@ class BookingController extends Controller
             ]);
         });
 
-        // Invalidate cached event lists (your versioned cache)
-        if (!Cache::has('events:version')) {
+        // Invalidate cached events version
+        /*if (!Cache::has('events:version')) {
             Cache::forever('events:version', 1);
         } else {
             Cache::increment('events:version');
         }
 
-        // Simple email (local dev: set MAIL_MAILER=log to see it in storage/logs/laravel.log)
-        Mail::to($user->email)->send(new BookingConfirmed($booking));
-
-        // Web vs API response
-        if ($r->expectsJson() || $r->wantsJson()) {
-            return response()->json(['message' => 'Booked!', 'booking' => $booking], 201);
-        }
-
-        return back()->with('status', 'Booking confirmed!');
+        // Send booking confirmation email (commented for local testing)
+        Mail::to($user->email)->send(new BookingConfirmed($booking));*/
+        Mail::to($user->email)->queue(new BookingConfirmed($booking));
+        return response()->json(['message' => 'Booked!', 'booking' => $booking], 201);
     }
 }

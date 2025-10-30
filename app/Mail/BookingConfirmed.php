@@ -2,45 +2,32 @@
 
 namespace App\Mail;
 
+use App\Models\Booking;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class BookingConfirmed extends Mailable
+class BookingConfirmed extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
-    public function __construct(public \App\Models\Booking $booking)
+    public $booking;
+
+    public function __construct(Booking $booking)
     {
+        $this->booking = $booking;
     }
 
-    public function envelope(): Envelope
+    public function build()
     {
-        return new Envelope(subject: 'Your booking is confirmed');
-    }
-
-    public function content(): Content
-    {
-        return new Content(markdown: 'emails.booking.confirmed', with: [
-            'user' => $this->booking->user,
-            'event' => $this->booking->event,
-            'qty' => $this->booking->qty,
-        ]);
-    }
-
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
-    public function attachments(): array
-    {
-        return [];
+        return $this->subject('Your Event Booking Confirmation')
+            ->markdown('emails.booking.confirmed')
+            ->with([
+                'event' => $this->booking->event->title,
+                'venue' => $this->booking->event->venue,
+                'qty' => $this->booking->qty,
+                'date' => $this->booking->event->event_at,
+            ]);
     }
 }

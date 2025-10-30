@@ -39,64 +39,67 @@ class EventController extends Controller
         }
     }
 
-    public function index(Request $r)
+    public function index(Request $request)
     {
-        $q = Event::query();
+        $query = Event::query();
 
-        if ($term = $r->query('q')) {
-            $q->where(function ($w) use ($term) {
-                $w->where('title', 'like', "%$term%")
-                    ->orWhere('venue', 'like', "%$term%");
+        // 🔍 Apply filters
+        if ($searchTerm = $request->query('q')) {
+            $query->where(function ($subQuery) use ($searchTerm) {
+                $subQuery->where('title', 'like', "%{$searchTerm}%")
+                    ->orWhere('venue', 'like', "%{$searchTerm}%");
             });
         }
-        if ($from = $r->query('from'))
-            $q->where('event_at', '>=', $from);
-        if ($to = $r->query('to'))
-            $q->where('event_at', '<=', $to);
 
-        $q->orderBy('event_at', 'asc');
-
-        $key = $this->listCacheKey($r);
-        $data = Cache::remember(
-            $key,
-            now()->addMinutes(5),
-            fn() =>
-            $q->paginate($this->perPage)->toArray()
-        );
-
-        if ($r->expectsJson() || $r->wantsJson()) {
-            return response()->json($data);
+        if ($fromDate = $request->query('from')) {
+            $query->where('event_at', '>=', $fromDate);
         }
 
-        // Rebuild paginator for Blade
-        $items = collect($data['data'])->map(fn($row) => (object) $row);
-        $events = new LengthAwarePaginator(
-            $items,
-            $data['total'],
-            $data['per_page'],
-            $data['current_page'],
-            ['path' => $r->url(), 'query' => $r->query()]
-        );
+        if ($toDate = $request->query('to')) {
+            $query->where('event_at', '<=', $toDate);
+        }
 
-        // --- NEW: get booked totals for visible rows (one query) ---
-        $ids = $items->pluck('id')->all();
-        $bookedMap = collect();
-        $mineMap = collect();
+        // 📊 Sorting
+        $sortBy = $request->query('sort', 'event_at');
+        $sortOrder = $request->query('order', 'asc');
+        $query->orderBy($sortBy, $sortOrder);
 
-        if (!empty($ids)) {
+        // 📄 Pagination
+        $perPage = $request->query('per_page', 10);
+        $events = $query->paginate($perPage);
+
+        $eventIds = $events->pluck('id')->all();
+
+        $bookedMap = $mineMap = collect();
+
+        if (!empty($eventIds)) {
+            // Total booked per event
             $bookedMap = Booking::selectRaw('event_id, SUM(qty) as booked')
-                ->whereIn('event_id', $ids)
+                ->whereIn('event_id', $eventIds)
                 ->groupBy('event_id')
                 ->pluck('booked', 'event_id');
 
-            if (auth()->check()) {
-                $mineMap = Booking::where('user_id', auth()->id())
-                    ->whereIn('event_id', $ids)
-                    ->pluck('qty', 'event_id');
-            }
+            // Simulated user for now
+            $userId = 1;
+
+            // User's own bookings
+            $mineMap = Booking::where('user_id', $userId)
+                ->whereIn('event_id', $eventIds)
+                ->pluck('qty', 'event_id');
         }
 
-        return view('events.index', compact('events', 'bookedMap', 'mineMap'));
+        $events->getCollection()->transform(function ($event) use ($bookedMap, $mineMap) {
+            $bookedCount = (int) ($bookedMap[$event->id] ?? 0);
+            $userBookedCount = (int) ($mineMap[$event->id] ?? 0);
+
+            $event->booked = $bookedCount;
+            $event->mine_qty = $userBookedCount;
+            $event->left = max($event->capacity - $bookedCount, 0);
+
+            return $event;
+        });
+
+        return response()->json($events);
     }
 
     public function store(Request $r)
@@ -105,20 +108,22 @@ class EventController extends Controller
             'title' => 'required|string|max:255',
             'venue' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
-            'event_at' => 'required|date',
+            'date' => 'required|date',
             'description' => 'nullable|string',
         ]);
+
+        // Map `date` → `event_at`
+        $data['event_at'] = $data['date'];
+        unset($data['date']);
 
         if (str_contains($data['event_at'], 'T')) {
             $data['event_at'] = str_replace('T', ' ', $data['event_at']);
         }
 
         $event = Event::create($data);
-        $this->bumpEventsVersion();
+        // $this->bumpEventsVersion();
 
-        return $r->expectsJson()
-            ? response()->json($event, 201)
-            : redirect()->route('admin.events.index')->with('status', 'Event created.');
+        return response()->json($event, 201);
     }
 
     public function show(Event $event)
@@ -142,7 +147,7 @@ class EventController extends Controller
         ]);
 
         $event->update($data);
-        $this->bumpEventsVersion();
+        // $this->bumpEventsVersion();
 
         return response()->json($event);
     }
@@ -150,7 +155,7 @@ class EventController extends Controller
     public function destroy(Event $event)
     {
         $event->delete();
-        $this->bumpEventsVersion();
+        // $this->bumpEventsVersion();
 
         return response()->json(['message' => 'Deleted']);
     }

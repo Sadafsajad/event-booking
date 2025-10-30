@@ -1,13 +1,10 @@
 @component('mail::message')
-# Booking Confirmed
+# Booking Confirmed 🎉
 
-Hi {{ $user->name }},
+You’ve successfully booked **{{ $event }}** at **{{ $venue }}**.
 
-**Event:** {{ $event->title }}
-**Venue:** {{ $event->venue }}
-**When:** {{ $event->event_at->format('d M Y, h:i A') }}
-**Tickets:** {{ $qty }}
+**Seats:** {{ $qty }}
+**Date:** {{ \Carbon\Carbon::parse($date)->toDayDateTimeString() }}
 
-Thanks,
-{{ config('app.name') }}
+Thanks for booking with us!
 @endcomponent
