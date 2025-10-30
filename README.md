@@ -1,61 +1,237 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+# EventBook – Event Booking Manager (Laravel)
 
-## About Laravel
+Plan events, book seats without overbooking, and view admin reports (top events, power users, occupancy%).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+* Email/password auth + Social login (Google & GitHub via Socialite)
+* Events: create (admin), list, search, filter (date range), paginate
+* Bookings: safe DB **transactions + row locking** (no overbooking)
+* Cached listings with version bump on create/update/booking
+* Admin reports:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+  * Top 5 events by bookings in last 30 days
+  * Users who booked > 3 events last month
+  * % occupancy for each event
 
-## Learning Laravel
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 1) Requirements
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+* PHP 8.2+
+* Composer
+* MySQL 8+ (or MariaDB)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## 2) Setup
 
-## Laravel Sponsors
+```bash
+git clone <your-repo> event-booking
+cd event-booking
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+cp .env.example .env
+composer install
+php artisan key:generate
+```
 
-### Premium Partners
+Edit **.env** (DB + app URL):
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```ini
+APP_NAME="EventBook"
+APP_URL=http://127.0.0.1:8000
 
-## Contributing
+DB_DATABASE=event_booking
+DB_USERNAME=root
+DB_PASSWORD=
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# Mail (local dev)
+MAIL_MAILER=log   # emails will be written to storage/logs/laravel.log
+```
 
-## Code of Conduct
+Create DB, then migrate:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan migrate
+```
 
-## Security Vulnerabilities
+> Optional: seed some demo events via Tinker
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+php artisan tinker
+>>> \App\Models\Event::factory()?->count(0); // if you have a factory
+>>> \App\Models\Event::create(['title'=>'Tech Conf','venue'=>'Hall A','capacity'=>100,'event_at'=>'2025-09-01 18:00']);
+>>> \App\Models\Event::create(['title'=>'Marketing Conf','venue'=>'City Mall','capacity'=>5,'event_at'=>'2025-09-10 16:30']);
+```
 
-## License
+Run the app:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+php artisan serve
+```
+
+Open: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
+
+---
+
+## 3) Social login configuration (Google & GitHub)
+
+You MUST use **your own client keys**.
+
+### Google
+
+1. Go to **Google Cloud Console → Credentials → Create OAuth client**
+   Type: **Web application**
+
+2. Authorized redirect URIs (add exactly):
+
+```
+http://127.0.0.1:8000/auth/google/callback
+```
+
+3. Put credentials in **.env**:
+
+```ini
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://127.0.0.1:8000/auth/google/callback
+```
+
+### GitHub
+
+1. Go to **[https://github.com/settings/developers](https://github.com/settings/developers) → OAuth Apps → New OAuth App**
+
+2. Homepage URL:
+
+```
+http://127.0.0.1:8000
+```
+
+Authorization callback URL:
+
+```
+http://127.0.0.1:8000/auth/github/callback
+```
+
+3. Put credentials in **.env**:
+
+```ini
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GITHUB_REDIRECT_URI=http://127.0.0.1:8000/auth/github/callback
+```
+
+### services.php
+
+`config/services.php` already expects env keys like:
+
+```php
+'google' => [
+    'client_id' => env('GOOGLE_CLIENT_ID'),
+    'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+    'redirect' => env('GOOGLE_REDIRECT_URI'),
+],
+'github' => [
+    'client_id' => env('GITHUB_CLIENT_ID'),
+    'client_secret' => env('GITHUB_CLIENT_SECRET'),
+    'redirect' => env('GITHUB_REDIRECT_URI'),
+],
+```
+
+---
+
+## 4) Authentication / Roles
+
+* Register or login via email, Google, or GitHub.
+* To make an **admin**, set `is_admin = 1` for a user:
+
+```bash
+php artisan tinker
+>>> \App\Models\User::where('email','admin@example.com')->update(['is_admin' => 1]);
+```
+
+Middleware alias is `admin` (registered in `bootstrap/app.php`).
+Admin-only routes live under `/admin/*`.
+
+---
+
+## 5) How to use
+
+### Public / User
+
+* **Browse events**: `GET /events`
+
+  * Search by title/venue, filter by date (from/to), paginate.
+* **Book an event**: `POST /events/{event}/book`
+
+  * Uses transaction + `lockForUpdate()` to prevent overbooking.
+  * A user can only have one booking row per event (`unique [user_id,event_id]`).
+  * If capacity is reached, the “Book” button turns into **“Sold out”**.
+
+### Admin
+
+* **Events list (admin)**: `GET /admin/events`
+* **Create event**: `GET /admin/events/create`, `POST /admin/events`
+
+  * Creating/updating bumps a cache version key so public list refreshes.
+* **Reports dashboard**: `GET /admin/reports`
+
+  * Top 5 events (last 30 days)
+  * Users who booked > 3 events (last month)
+  * Occupancy % per event
+
+---
+
+## 6) Caching
+
+Event list is cached for **5 minutes**.
+Whenever events are created/updated/deleted **or a booking is made**, a single
+`events:version` cache key is incremented to invalidate all list caches instantly.
+
+You can clear the app cache anytime:
+
+```bash
+php artisan optimize:clear
+```
+
+---
+
+## 7) Email (Booking confirmation)
+
+By default, **MAIL\_MAILER=log** writes emails to `storage/logs/laravel.log`.
+Configure SMTP in `.env` if you want real emails.
+
+---
+
+## 8) Routes quick map
+
+```
+/                       Welcome page
+/login, /register       Auth (also Google/GitHub)
+/events                 Public listing & booking (logged-in users)
+/events/{event}         Event details (JSON)
+/admin/events           Admin listing
+/admin/events/create    Admin create form
+/admin/reports          Admin reports dashboard
+
+# API-ish (JSON) reports also exist:
+reports/top5-last30
+reports/power-users-last-month
+reports/occupancy
+```
+
+List them:
+
+```bash
+php artisan route:list
+```
+
+---
+
+* If you change Google/GitHub callback URLs, **update both** the provider console and `.env`.
+* Clear caches after changing `.env` or routes:
+
+  ```bash
+  php artisan optimize:clear
+  ```
+
+Thank you 
+Sadaf Sajad
