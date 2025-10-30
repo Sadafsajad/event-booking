@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class EventController extends Controller
@@ -80,7 +81,7 @@ class EventController extends Controller
                 ->pluck('booked', 'event_id');
 
             // Simulated user for now
-            $userId = 1;
+            $userId = Auth::id();
 
             // User's own bookings
             $mineMap = Booking::where('user_id', $userId)

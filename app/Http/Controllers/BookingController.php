@@ -21,17 +21,16 @@ class BookingController extends Controller
         $data = $r->validate(['qty' => 'nullable|integer|min:1']);
         $qty = $data['qty'] ?? 1;
 
-        // temporarily disable auth dependency while testing
-        // $user = Auth::user();
-        $user = (object) [
-            'id' => 1,
-            'email' => 'sadafsajad451@gmail.com'
-        ];
+        // ✅ Use authenticated user from Sanctum
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
         $booking = DB::transaction(function () use ($event, $qty, $user) {
             // Lock event to avoid race conditions
             $e = Event::whereKey($event->id)->lockForUpdate()->first();
-
 
             // Check current seats
             $booked = (int) Booking::where('event_id', $e->id)->sum('qty');
@@ -50,15 +49,15 @@ class BookingController extends Controller
         });
 
         // Invalidate cached events version
-        /*if (!Cache::has('events:version')) {
+        if (!Cache::has('events:version')) {
             Cache::forever('events:version', 1);
         } else {
             Cache::increment('events:version');
         }
 
-        // Send booking confirmation email (commented for local testing)
-        Mail::to($user->email)->send(new BookingConfirmed($booking));*/
+        // Send booking confirmation email asynchronously
         Mail::to($user->email)->queue(new BookingConfirmed($booking));
+
         return response()->json(['message' => 'Booked!', 'booking' => $booking], 201);
     }
 }
