@@ -61,8 +61,8 @@ class EventController extends Controller
         }
 
         // 📊 Sorting
-        $sortBy = $request->query('sort', 'event_at');
-        $sortOrder = $request->query('order', 'asc');
+        $sortBy = $request->query('sort', 'id');
+        $sortOrder = $request->query('order', 'desc');
         $query->orderBy($sortBy, $sortOrder);
 
         // 📄 Pagination

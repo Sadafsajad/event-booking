@@ -17,9 +17,10 @@ Route::middleware('auth:sanctum')->group(function () {
     /* ✅ Events & Booking */
     Route::get('/events', [EventController::class, 'index']);
     Route::post('/bookings/{event}', [BookingController::class, 'store']);
-
+    
     /*  Admin event creation */
     Route::post('/admin/events', [EventController::class, 'store']);
+    Route::delete('/admin/events/{event}', [EventController::class, 'destroy']);
 
     /*  Reports API */
     Route::get('/reports/top5', [ReportController::class, 'top5EventsLast30']);
