@@ -21,30 +21,31 @@ class ReportController extends Controller
     public function top5EventsLast30()
     {
         $rows = $this->queryTop5Last30();
-        if (request()->expectsJson() || request()->wantsJson()) {
-            return response()->json($rows);
-        }
-        return view('admin.reports.top5', ['rows' => $rows]);
+        return response()->json([
+            'success' => true,
+            'data' => $rows
+        ]);
     }
 
     // 2) Users who booked >3 events last month (DISTINCT events)
     public function usersBookedMoreThan3LastMonth()
     {
         $rows = $this->queryPowerUsersLastMonth();
-        if (request()->expectsJson() || request()->wantsJson()) {
-            return response()->json($rows);
-        }
-        return view('admin.reports.power_users', ['rows' => $rows]);
+        return response()->json([
+            'success' => true,
+            'data' => $rows
+        ]);
     }
+
 
     // 3) % occupancy for each event
     public function occupancyPerEvent()
     {
         $rows = $this->queryOccupancy();
-        if (request()->expectsJson() || request()->wantsJson()) {
-            return response()->json($rows);
-        }
-        return view('admin.reports.occupancy', ['rows' => $rows]);
+        return response()->json([
+            'success' => true,
+            'data' => $rows
+        ]);
     }
 
     /* ----------------- Raw queries (reuse) ----------------- */
