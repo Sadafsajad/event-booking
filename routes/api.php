@@ -21,9 +21,9 @@ Route::middleware('auth:sanctum')->group(function () {
     /*  Admin event creation */
     Route::post('/admin/events', [EventController::class, 'store']);
     Route::delete('/admin/events/{event}', [EventController::class, 'destroy']);
+    Route::get('/admin/events/{event}/edit', [EventController::class, 'edit']);
+    Route::put('/admin/events/{event}', [EventController::class, 'update']);
 
     /*  Reports API */
-    Route::get('/reports/top5', [ReportController::class, 'top5EventsLast30']);
-    Route::get('/reports/power-users', [ReportController::class, 'usersBookedMoreThan3LastMonth']);
-    Route::get('/reports/occupancy', [ReportController::class, 'occupancyPerEvent']);
+    Route::get('/reports', [ReportController::class, 'index']);
 });
